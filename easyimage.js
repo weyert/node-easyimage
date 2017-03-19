@@ -42,6 +42,10 @@ function info(file) {
 		var rx = /^(\d*\.?\d*)([KMGT]?B)$/;  // regex for extract the float value and its unit
 		var sizeArray = rx.exec(sizeString);
 
+		// if imageMagick didn't return sizeString with unit on CentOS machine
+		if (!sizeArray)
+			return parseFloat(sizeString)		
+
 		return parseFloat(sizeArray[1]) * unit[sizeArray[2]];
 	};
 
@@ -217,6 +221,33 @@ exports.rotate = function(options) {
 	return deferred.promise;
 };
 
+// auto-orient a file
+exports.autoOrient = function(options) {
+
+	var deferred = Q.defer();
+
+	function imgAutoOrient() {
+
+		if (options.src === undefined || options.dst === undefined) return deferred.reject(error_messages['path']);
+
+		var args = [options.src];
+
+		args.push('-auto-orient');
+
+		args.push(options.dst);
+
+		child = exec('convert', args, function(err, stdout, stderr) {
+			if (err) deferred.reject(err);
+			else deferred.resolve(info(options.dst));
+		});
+
+	}
+
+	directoryCheck(options, imgAutoOrient);
+
+	return deferred.promise;
+};
+
 // resize an image
 exports.resize = function(options) {
 
@@ -225,11 +256,11 @@ exports.resize = function(options) {
 	function imgResize() {
 
 		if (options.src === undefined || options.dst === undefined) return deferred.reject(error_messages['path']);
-		if (options.width === undefined) return deferred.reject(error_messages['dim']);
+		if (options.width === undefined && options.height === undefined) return deferred.reject(error_messages['dim']);
 
-		options.height = options.height || options.width;
+		options.gravity = options.gravity || 'Center';
 
-    var args = [options.src]
+	    var args = [options.src]
 
 		if (options.flatten) {
 			args.push('-flatten')
@@ -260,6 +291,7 @@ exports.resize = function(options) {
 			args.push('-background')
 			args.push(options.background)
 		}
+
     args.push(options.dst)
 
 		child = exec('convert', args, function(err, stdout, stderr) {
@@ -442,7 +474,7 @@ exports.thumbnail = function(options) {
 	    args.push('-gravity')
 	    args.push(options.gravity)
 	    args.push('-interpolate')
-	    args.push('bicubic')
+	    args.push('catrom')
 	    args.push('-strip')
 	    args.push('-thumbnail')
 	    args.push(resizewidth + 'x' + resizeheight)
